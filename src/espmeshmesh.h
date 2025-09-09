@@ -61,6 +61,8 @@ class EspMeshMesh {
 #ifdef USE_CONNECTED_PROTOCOL
   ConnectedPath *getConnectedPath() const { return mConnectedPath; }
 #endif
+  const DiscoveryItem_t *getDiscoveryTable() const;
+  uint8_t getDiscoveryTableSize() const;
  public:
   EspMeshMesh(int baud_rate, int tx_buffer, int rx_buffer);
   void pre_setup();

@@ -216,4 +216,12 @@ void Discovery::discoveryStart(uint8_t slotnum) {
   LIB_LOGD(TAG, "Discovery::handle_frame discovery start %d", mStart.slotnum);
 }
 
+const DiscoveryItem_t *Discovery::getDiscoveryTable() const {
+  return discovery_table;
+}
+
+uint8_t Discovery::getDiscoveryTableSize() const {
+  return discovery_table_index;
+}
+
 }  // namespace espmeshmesh

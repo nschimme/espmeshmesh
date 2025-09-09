@@ -44,6 +44,14 @@ EspMeshMesh *EspMeshMesh::singleton = nullptr;
 
 EspMeshMesh *EspMeshMesh::getInstance() { return singleton; }
 
+const DiscoveryItem_t *EspMeshMesh::getDiscoveryTable() const {
+  return mDiscovery.getDiscoveryTable();
+}
+
+uint8_t EspMeshMesh::getDiscoveryTableSize() const {
+  return mDiscovery.getDiscoveryTableSize();
+}
+
 EspMeshMesh::EspMeshMesh(int baud_rate, int tx_buffer, int rx_buffer)
     : mBaudRate(baud_rate), mTxBuffer(tx_buffer), mRxBuffer(rx_buffer) {
   if (singleton == nullptr)

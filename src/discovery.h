@@ -69,6 +69,8 @@ class Discovery {
   static uint32_t chipId();
   void discoveryStart(uint8_t *buf, uint16_t len);
   void discoveryStart(uint8_t slotnum = 100);
+  const DiscoveryItem_t *getDiscoveryTable() const;
+  uint8_t getDiscoveryTableSize() const;
 
  private:
   void findMaxRssi(int16_t max, int16_t &maxRssi, uint32_t &maxRssiNodeId);
