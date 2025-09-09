@@ -2,7 +2,6 @@
 #include "log.h"
 #include "commands.h"
 #include "espmeshmesh.h"
-#include "graph.h"
 
 #if USE_ESP32
 #include <esp_random.h>
@@ -35,14 +34,16 @@ namespace espmeshmesh {
 #define DISCCMD_BEACONS_SEND_REQ 0x08
 #define DISCCMD_BEACONS_SEND_REP 0x09
 
+#include "graph.h"
 static const char *TAG = "espmeshmesh.discovery";
 
 Discovery::Discovery(EspMeshMesh *parent) : mParent(parent) {}
 
 void Discovery::init() {
-    if (mParent->getNodes()) {
-        mParent->getNodes()->clear();
-    }
+  clear_table();
+  if (mParent->getNodes()) {
+    mParent->getNodes()->clear();
+  }
 }
 
 void Discovery::loop() {
@@ -88,17 +89,69 @@ void Discovery::loop() {
 }
 
 void Discovery::process_beacon(uint32_t from, uint32_t id, int16_t rssi1, int16_t rssi2) {
+  uint8_t i;
   LIB_LOGD(TAG, "discovery_process_beacon from:%06lX id:%06lX rssi1:%d rssi2:%d\n", from, id, rssi1, rssi2);
+
+  // Populate the old discovery_table for backward compatibility
+  for (i = 0; i < discovery_table_index; i++)
+    if (discovery_table[i].id == id)
+      break;
+  if (i < DISCOVERY_TABLE_SIZE) {
+    discovery_table[i].rssi1 = rssi1;
+    discovery_table[i].rssi2 = rssi2;
+    discovery_table[i].id = id;
+    if (i == discovery_table_index)
+      discovery_table_index++;
+  }
+
+  // Populate the new Graph
   if (mParent->getNodes()) {
       mParent->getNodes()->add_edge(from, id, (rssi1 + rssi2) / 2);
   }
 }
 
+void Discovery::clear_table(void) {
+  memset(discovery_table, '\0', sizeof(DiscoveryItem_t) * 64);
+  discovery_table_index = 0;
+}
+
 uint8_t Discovery::handle_frame(uint8_t *buf, uint16_t len, EspMeshMesh *parent) {
   uint8_t err = 1;
   switch (buf[0]) {
+    case DISCCMD_RESET_TABLE_REQ:
+      if (len == 1) {
+        uint8_t rep[2];
+        rep[0] = CMD_DISCOVERY_REP;
+        rep[1] = DISCCMD_RESET_TABLE_REP;
+        clear_table();
+        parent->commandReply(rep, 2);
+        err = 0;
+      }
+      break;
+    case DISCCMD_TABLE_SIZE_REQ:
+      if (len == 1) {
+        uint8_t rep[3];
+        rep[0] = CMD_DISCOVERY_REP;
+        rep[1] = DISCCMD_TABLE_SIZE_REP;
+        rep[2] = discovery_table_index;
+        parent->commandReply(rep, 3);
+        err = 0;
+      }
+      break;
+    case DISCCMD_TABLE_ITEM_GET_REQ:
+      if (len == 2 && buf[1] < discovery_table_index) {
+        uint8_t rep[3 + sizeof(DiscoveryItem_t)];
+        rep[0] = CMD_DISCOVERY_REP;
+        rep[1] = DISCCMD_TABLE_ITEM_GET_REP;
+        rep[2] = buf[1];
+        memcpy(rep + 3, discovery_table + buf[1], sizeof(DiscoveryItem_t));
+        parent->commandReply(rep, 3 + sizeof(DiscoveryItem_t));
+        err = 0;
+      }
+      break;
     case DISCCMD_START_REQ:
       if (len == sizeof(CmdStart_t) - 1) {
+        // Silently ignore discovery starts if we already started., master can send mutiple packets
         if (mRunPhase == 0) {
           discoveryStart(buf, len);
           buf[0] = CMD_DISCOVERY_REP;
@@ -142,6 +195,19 @@ uint32_t Discovery::chipId() {
 #else
   return system_get_chip_id();
 #endif
+}
+
+void Discovery::findMaxRssi(int16_t max, int16_t &maxRssi, uint32_t &maxRssiNodeId) {
+  maxRssiNodeId = 0;
+  maxRssi = NULL_RSSI;
+
+  for (uint8_t i = 0; i < discovery_table_index; i++) {
+    uint16_t rssi = std::min(discovery_table[i].rssi1, discovery_table[i].rssi2);
+    if (rssi > maxRssi && rssi < max) {
+      maxRssi = rssi;
+      maxRssiNodeId = discovery_table[i].id;
+    }
+  }
 }
 
 void Discovery::discoveryStart(uint8_t *buf, uint16_t len) {
