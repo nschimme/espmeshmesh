@@ -24,5 +24,24 @@
   "platforms": [
     "espressif32",
     "espressif8266"
-  ]
+  ],
+  "build": {
+    "srcFilter": [
+      "+<src/broadcast.cpp>",
+      "+<src/connectedpath.cpp>",
+      "+<src/crc16.cpp>",
+      "+<src/defines.cpp>",
+      "+<src/discovery.cpp>",
+      "+<src/encryption.c>",
+      "+<src/espmeshmesh.cpp>",
+      "+<src/graph.cpp>",
+      "+<src/log.cpp>",
+      "+<src/memringbuffer.cpp>",
+      "+<src/multipath.cpp>",
+      "+<src/packetbuf.cpp>",
+      "+<src/polite.cpp>",
+      "+<src/recvdups.cpp>",
+      "+<src/unicast.cpp>"
+    ]
+  }
 }

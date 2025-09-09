@@ -50,6 +50,22 @@ EspMeshMesh::EspMeshMesh(int baud_rate, int tx_buffer, int rx_buffer)
     singleton = this;
 }
 
+EspMeshMesh::~EspMeshMesh() {
+  delete mDiscovery;
+  delete mGraph;
+  delete broadcast;
+  delete unicast;
+#ifdef USE_MULTIPATH_PROTOCOL
+  delete multipath;
+#endif
+#ifdef USE_POLITE_BROADCAST_PROTOCOL
+  delete mPoliteBroadcast;
+#endif
+#ifdef USE_CONNECTED_PROTOCOL
+  delete mConnectedPath;
+#endif
+}
+
 void EspMeshMesh::pre_setup() {
 #ifdef ESP8266
   mHwSerial = &Serial;
@@ -366,7 +382,9 @@ void EspMeshMesh::setup(EspMeshMeshSetupConfig *config) {
   mConnectedPath->bindPort(onConnectedPathNewClientCb, this, 0);
 #endif
 
-  mDiscovery.init();
+  mDiscovery = new Discovery(this);
+  mDiscovery->init();
+  mGraph = new Graph();
   broadcast->open();
   broadcast->setRecv_cb(user_broadcast_recv_cb);
   unicast->setup();
@@ -429,8 +447,8 @@ void EspMeshMesh::loop() {
   mConnectedPath->loop();
 #endif
   // Execute discovery if is running
-  if (mDiscovery.isRunning())
-    mDiscovery.loop(this);
+  if (mDiscovery->isRunning())
+    mDiscovery->loop();
 
 #ifdef ESP8266
   if (!mWorkAround && elapsedMillis(now, mElapsed1) > 2000) {
@@ -670,7 +688,7 @@ void EspMeshMesh::handleFrame(const uint8_t *data, uint16_t len, DataSrc src, ui
       break;
     case CMD_DISCOVERY_REQ:
       if (len > 1) {
-        err = mDiscovery.handle_frame(buf + 1, len - 1, this);
+        err = mDiscovery->handle_frame(buf + 1, len - 1, this);
       }
       break;
     case CMD_BROADCAST_SEND:  // 70 AABBCCDDEE...ZZ
@@ -771,7 +789,7 @@ void EspMeshMesh::replyHandleFrame(uint8_t *buf, uint16_t len, DataSrc src, uint
       // Compatibility with previous discovery procedure
       if (len == sizeof(BaconsDataCompat_t)) {
         BaconsDataCompat_t *b = (BaconsDataCompat_t *) buf;
-        mDiscovery.process_beacon(b->id, b->rssi, 0);
+        mDiscovery->process_beacon(broadcastFromAddress(), b->id, b->rssi, 0);
       }
       break;
     default:

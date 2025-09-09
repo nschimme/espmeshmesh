@@ -4,6 +4,7 @@
 #include "packetbuf.h"
 #include "discovery.h"
 #include "memringbuffer.h"
+#include "graph.h"
 
 #include <string>
 
@@ -18,6 +19,7 @@
 namespace espmeshmesh {
 
 typedef std::function<int8_t(uint8_t *data, uint16_t len, uint32_t from)> HandleFrameCbFn;
+typedef std::function<void()> GraphUpdatedCbFn;
 typedef void (*EspHomeDataReceivedCbFn)(uint16_t, uint8_t *, uint16_t);
 
 typedef enum { WAIT_START, WAIT_DATA, WAIT_ESCAPE, WAIT_CRC16_1, WAIT_CRC16_2 } RecvState;
@@ -32,6 +34,7 @@ class PoliteBroadcastProtocol;
 #ifdef USE_CONNECTED_PROTOCOL
 class ConnectedPath;
 #endif
+class Graph;
 
 #define HANDLE_UART_OK 0
 #define HANDLE_UART_ERROR 1
@@ -63,6 +66,7 @@ class EspMeshMesh {
 #endif
  public:
   EspMeshMesh(int baud_rate, int tx_buffer, int rx_buffer);
+  ~EspMeshMesh();
   void pre_setup();
 #ifdef IDF_VER
   static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
@@ -72,6 +76,11 @@ class EspMeshMesh {
   void setupWifi(const char *hostname, uint8_t channel, uint8_t txPower);
   void setup(EspMeshMeshSetupConfig *config);
   void setAesPassword(const char *password) { mAesPassword = password; }
+  void onGraphUpdated(GraphUpdatedCbFn cb) { mGraphUpdatedCb = cb; }
+  void graphUpdated() {
+    if (mGraphUpdatedCb)
+      mGraphUpdatedCb();
+  }
   void dump_config();
   void loop();
 
@@ -82,6 +91,7 @@ class EspMeshMesh {
   void uartSendData(const uint8_t *buff, uint16_t len);
   int16_t lastPacketRssi() const { return mRssiHandle; }
   uint32_t broadcastFromAddress() const { return mBroadcastFromAddress; }
+  Graph *getNodes() const { return mGraph; }
   void broadCastSendData(const uint8_t *buff, uint16_t len);
   void uniCastSendData(const uint8_t *buff, uint16_t len, uint32_t addr);
 #ifdef USE_MULTIPATH_PROTOCOL
@@ -166,7 +176,8 @@ public:
   uint8_t mRecvPath[32];
   uint8_t mRecvPathSize = 0;
 
-  Discovery mDiscovery;
+  Discovery *mDiscovery = nullptr;
+  Graph *mGraph = nullptr;
 
  private:
   // UartRingBuffer;
@@ -187,6 +198,7 @@ public:
   void addHandleFrameCb(HandleFrameCbFn cb) { mHandleFrameCbs.push_back(cb); }
 private:
   std::list<HandleFrameCbFn> mHandleFrameCbs;
+  GraphUpdatedCbFn mGraphUpdatedCb = nullptr;
 
 public:
   void setLogCb(LogCbFn cb) { setLibLogCb(cb); }

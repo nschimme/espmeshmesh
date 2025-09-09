@@ -5,8 +5,6 @@
 
 namespace espmeshmesh {
 
-#define DISCOVERY_TABLE_SIZE 64
-
 struct CmdStartCompat_st {
   uint8_t cmd1;
   uint8_t mask;
@@ -39,14 +37,6 @@ struct BaconsData_st {
 } __attribute__((packed));
 typedef struct BaconsData_st BaconsData_t;
 
-struct DiscoveryItem_st {
-  uint32_t id;
-  int16_t rssi1;
-  int16_t rssi2;
-  uint16_t flags;
-} __attribute__((packed));
-typedef struct DiscoveryItem_st DiscoveryItem_t;
-
 struct CmdAssociate_st {
   uint8_t cmd1;
   uint8_t cmd2;
@@ -60,22 +50,18 @@ typedef struct CmdAssociate_st CmdAssociate_t;
 class EspMeshMesh;
 class Discovery {
  public:
+  Discovery(EspMeshMesh *parent);
   void init();
-  void loop(EspMeshMesh *parent);
+  void loop();
   bool isRunning() const { return mRunPhase > 0; }
-  void process_beacon(uint32_t id, int16_t rssi1, int16_t rssi2);
-  void clear_table(void);
+  void process_beacon(uint32_t from, uint32_t id, int16_t rssi1, int16_t rssi2);
   uint8_t handle_frame(uint8_t *buf, uint16_t len, EspMeshMesh *parent);
   static uint32_t chipId();
   void discoveryStart(uint8_t *buf, uint16_t len);
   void discoveryStart(uint8_t slotnum = 100);
 
  private:
-  void findMaxRssi(int16_t max, int16_t &maxRssi, uint32_t &maxRssiNodeId);
-
- private:
-  uint8_t discovery_table_index = 0;
-  DiscoveryItem_t discovery_table[DISCOVERY_TABLE_SIZE];
+  EspMeshMesh *mParent;
   CmdStart_st mStart;
   CmdStartCompat_st mStartCompat;
   uint32_t mStartTime = 0;
